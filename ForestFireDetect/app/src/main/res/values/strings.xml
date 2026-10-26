@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">Forest Fire Monitor</string>
+    <string name="login">Login</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="dashboard">Dashboard</string>
+</resources>

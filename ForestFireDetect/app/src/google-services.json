@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673089671802",
+    "project_id": "forestfiredetect-530b4",
+    "storage_bucket": "forestfiredetect-530b4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673089671802:android:361bffc4243a5cf698a1c3",
+        "android_client_info": {
+          "package_name": "com.divyanshi.forestfiredetect"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCg8ErN-P_6LzEP7i--2nhbDgRHHDp0GQo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

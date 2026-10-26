@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Forest Fire Detection System</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #0a0f0d; --card: #111a14; --card2: #162119;
+      --border: #1e3325; --green: #00cc66; --green2: #00ff88;
+      --yellow: #ffcc00; --orange: #ff6600; --red: #ff2244;
+      --text: #c8e6c9; --muted: #5a8a6a; --font: 'Segoe UI', system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #0d1f14 0%, #162119 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 24px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon { font-size: 2rem; }
+    .logo-text h1 { font-size: 1.2rem; color: var(--green2); letter-spacing: 1px; }
+    .logo-text p { font-size: 0.75rem; color: var(--muted); }
+    .header-status { display: flex; align-items: center; gap: 20px; }
+    .pulse-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--green); box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(1.4)} }
+    .live-label { font-size: 0.75rem; color: var(--green); font-weight: 600; letter-spacing: 2px; }
+    .system-time { font-size: 0.85rem; color: var(--muted); font-family: monospace; }
+
+    .main { padding: 20px 24px; display: grid; gap: 20px; }
+    .top-row { display: grid; grid-template-columns: 1fr 1fr 1fr 340px; gap: 16px; }
+    .mid-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; }
+    .bot-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+    .card-title {
+      font-size: 0.7rem; letter-spacing: 2px; color: var(--muted);
+      text-transform: uppercase; margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .card-title span { font-size: 1rem; }
+
+    .stat-value { font-size: 2.4rem; font-weight: 700; color: var(--green2); line-height: 1; }
+    .stat-unit { font-size: 0.9rem; color: var(--muted); margin-left: 4px; }
+    .stat-label { font-size: 0.75rem; color: var(--muted); margin-top: 6px; }
+    .stat-bar { height: 4px; border-radius: 2px; background: #1a2e20; margin-top: 10px; overflow: hidden; }
+    .stat-fill { height: 100%; border-radius: 2px; transition: width .5s, background .5s; }
+
+    .risk-display { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 0; }
+    .risk-ring { position: relative; width: 110px; height: 110px; }
+    .risk-ring svg { transform: rotate(-90deg); }
+    .risk-ring-bg { fill: none; stroke: #1a2e20; stroke-width: 10; }
+    .risk-ring-fill { fill: none; stroke-width: 10; stroke-linecap: round; transition: all .5s; }
+    .risk-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 1.6rem; font-weight: 700; text-align: center; }
+    .risk-label-text { font-size: 0.8rem; letter-spacing: 1px; margin-top: 8px; font-weight: 600; }
+
+    #sensors-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px; }
+    .sensor-card {
+      background: var(--card2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; position: relative; transition: border-color .3s, box-shadow .3s;
+    }
+    .sensor-card.alert-2 { border-color: var(--orange); box-shadow: 0 0 15px rgba(255,102,0,.2); }
+    .sensor-card.alert-3 { border-color: var(--red); box-shadow: 0 0 20px rgba(255,0,0,.3); animation: fireAlert 1s infinite; }
+    @keyframes fireAlert { 0%,100%{box-shadow:0 0 15px rgba(255,0,0,.3)} 50%{box-shadow:0 0 30px rgba(255,50,0,.6)} }
+
+    .sensor-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
+    .sensor-name { font-size: 0.95rem; font-weight: 600; color: var(--green2); }
+    .sensor-loc { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
+    .sensor-badge {
+      font-size: 0.62rem; font-weight: 700; letter-spacing: 1px;
+      padding: 3px 8px; border-radius: 20px;
+      background: rgba(0,204,102,.15); color: var(--green); border: 1px solid rgba(0,204,102,.3);
+    }
+    .sensor-badge.alert-1 { background: rgba(255,204,0,.15); color: var(--yellow); border-color: rgba(255,204,0,.4); }
+    .sensor-badge.alert-2 { background: rgba(255,102,0,.15); color: var(--orange); border-color: rgba(255,102,0,.4); }
+    .sensor-badge.alert-3 { background: rgba(255,34,68,.15); color: var(--red); border-color: rgba(255,34,68,.5); }
+
+    .sensor-metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .metric { background: rgba(0,0,0,.2); border-radius: 8px; padding: 10px; }
+    .metric-icon { font-size: 1.1rem; margin-bottom: 4px; }
+    .metric-val { font-size: 1.1rem; font-weight: 700; }
+    .metric-name { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+    .sensor-risk-bar { margin-top: 12px; }
+    .risk-bar-track { height: 6px; border-radius: 3px; background: #1a2e20; overflow: hidden; }
+    .risk-bar-fill { height: 100%; border-radius: 3px; transition: width .5s, background .5s; }
+    .risk-bar-label { display: flex; justify-content: space-between; font-size: 0.65rem; color: var(--muted); margin-top: 4px; }
+
+    .sensor-gps { margin-top: 10px; font-size: 0.68rem; }
+    .gps-link {
+      display: inline-flex; align-items: center; gap: 5px;
+      color: #00ccff; text-decoration: none;
+      padding: 4px 8px; border-radius: 6px;
+      background: rgba(0,204,255,.08); border: 1px solid rgba(0,204,255,.2);
+      transition: background .2s;
+    }
+    .gps-link:hover { background: rgba(0,204,255,.18); }
+    .gps-no { color: var(--muted); font-style: italic; }
+
+    .sensor-controls { display: flex; gap: 8px; margin-top: 12px; }
+    .btn-fire {
+      flex: 1; padding: 7px; border-radius: 7px; border: none; cursor: pointer;
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; transition: all .2s;
+    }
+    .btn-fire.off { background: rgba(255,34,68,.1); color: var(--red); border: 1px solid rgba(255,34,68,.3); }
+    .btn-fire.off:hover { background: rgba(255,34,68,.25); }
+    .btn-fire.on { background: rgba(255,34,68,.4); color: #fff; border: 1px solid var(--red); }
+    .btn-reset {
+      padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border);
+      background: rgba(255,255,255,.04); color: var(--muted);
+      font-size: 0.72rem; cursor: pointer; transition: all .2s;
+    }
+    .btn-reset:hover { background: rgba(255,255,255,.08); color: var(--text); }
+
+    .chart-wrap { position: relative; height: 200px; }
+
+    #alert-log { max-height: 300px; overflow-y: auto; }
+    .alert-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: 8px;
+      background: rgba(0,0,0,.2); margin-bottom: 8px; border-left: 3px solid;
+    }
+    .alert-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .alert-content { flex: 1; }
+    .alert-title { font-size: 0.8rem; font-weight: 600; }
+    .alert-meta { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+    .alert-score { font-size: 0.8rem; font-weight: 700; }
+    .no-alerts { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 20px; }
+
+    .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .sum-item { background: rgba(0,0,0,.2); border-radius: 8px; padding: 12px; text-align: center; }
+    .sum-val { font-size: 1.5rem; font-weight: 700; color: var(--green2); }
+    .sum-label { font-size: 0.65rem; color: var(--muted); letter-spacing: 1px; margin-top: 3px; }
+
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    @media (max-width: 1200px) { .top-row { grid-template-columns: 1fr 1fr; } .mid-row { grid-template-columns: 1fr; } }
+    @media (max-width: 768px) { .top-row { grid-template-columns: 1fr; } .bot-row { grid-template-columns: 1fr; } .main { padding: 12px; } }
+
+    #toast-container { position: fixed; top: 70px; right: 20px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
+    .toast {
+      background: #1a0a0a; border: 1px solid var(--red); border-radius: 10px;
+      padding: 12px 16px; min-width: 260px; box-shadow: 0 4px 20px rgba(255,0,0,.3);
+      animation: slideIn .3s ease;
+    }
+    .toast.warning { border-color: var(--orange); box-shadow: 0 4px 20px rgba(255,102,0,.2); }
+    @keyframes slideIn { from{transform:translateX(300px);opacity:0} to{transform:translateX(0);opacity:1} }
+    .toast-title { font-size: 0.85rem; font-weight: 700; color: var(--red); }
+    .toast.warning .toast-title { color: var(--orange); }
+    .toast-body { font-size: 0.72rem; color: var(--muted); margin-top: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌲</div>
+    <div class="logo-text">
+      <h1>FOREST FIRE DETECTION SYSTEM</h1>
+      <p>Real-Time IoT Sensor Network — 5 Active Zones</p>
+    </div>
+  </div>
+  <div class="header-status">
+    <div class="pulse-dot"></div>
+    <span class="live-label">LIVE</span>
+    <span class="system-time" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div id="toast-container"></div>
+
+<div class="main">
+  <div class="top-row">
+    <div class="card">
+      <div class="card-title"><span>🌡️</span> Avg Temperature</div>
+      <div><span class="stat-value" id="avg-temp">--</span><span class="stat-unit">°C</span></div>
+      <div class="stat-label">Across all zones</div>
+      <div class="stat-bar"><div class="stat-fill" id="temp-bar" style="width:0%;background:var(--green)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>💧</span> Avg Humidity</div>
+      <div><span class="stat-value" id="avg-hum">--</span><span class="stat-unit">%</span></div>
+      <div class="stat-label">Relative humidity</div>
+      <div class="stat-bar"><div class="stat-fill" id="hum-bar" style="width:0%;background:var(--green)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🔥</span> Smoke Index</div>
+      <div><span class="stat-value" id="avg-smoke">--</span><span class="stat-unit">ppm</span></div>
+      <div class="stat-label">Particulate matter</div>
+      <div class="stat-bar"><div class="stat-fill" id="smoke-bar" style="width:0%;background:var(--green)"></div></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>⚠️</span> Overall Risk Level</div>
+      <div class="risk-display">
+        <div class="risk-ring">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle class="risk-ring-bg" cx="55" cy="55" r="45"/>
+            <circle class="risk-ring-fill" id="risk-ring-fill" cx="55" cy="55" r="45"
+              stroke-dasharray="283" stroke-dashoffset="283" stroke="var(--green)"/>
+          </svg>
+          <div class="risk-num" id="risk-num" style="color:var(--green)">0</div>
+        </div>
+        <div class="risk-label-text" id="risk-label" style="color:var(--green)">NORMAL</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mid-row">
+    <div class="card">
+      <div class="card-title"><span>📡</span> IoT Sensor Zones</div>
+      <div id="sensors-grid">
+        <div style="color:var(--muted);font-size:.8rem;padding:20px;text-align:center;animation:pulse 1.5s infinite">
+          Connecting to sensor network...
+        </div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-title"><span>📊</span> System Summary</div>
+        <div class="summary-grid">
+          <div class="sum-item"><div class="sum-val" id="sum-sensors">5</div><div class="sum-label">ACTIVE SENSORS</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-alerts" style="color:var(--red)">0</div><div class="sum-label">ACTIVE ALERTS</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-avg-risk">0</div><div class="sum-label">AVG RISK SCORE</div></div>
+          <div class="sum-item"><div class="sum-val" id="sum-max-temp">--</div><div class="sum-label">MAX TEMP (°C)</div></div>
+        </div>
+        <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+          <div style="font-size:.65rem;color:var(--muted);letter-spacing:1px;margin-bottom:8px">CO₂ LEVELS (ppm)</div>
+          <div id="co2-bars"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span>🚨</span> Alert Log</div>
+        <div id="alert-log"><div class="no-alerts">✅ All zones normal</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bot-row">
+    <div class="card">
+      <div class="card-title"><span>📈</span> Temperature Trend — Zone Alpha</div>
+      <div class="chart-wrap"><canvas id="tempChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>📈</span> Risk Score Trend — All Zones</div>
+      <div class="chart-wrap"><canvas id="riskChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WS_URL = `ws://${location.host}`;
+let ws, reconnectTimer;
+let sensorsData = [];
+const ZONE_COLORS = ['#00ff88','#00ccff','#ffcc00','#ff6600','#cc88ff'];
+
+let chartDataTemp = {
+  labels: [],
+  datasets: [{ label: 'Temp °C', data: [], borderColor: '#ff6600', backgroundColor: 'rgba(255,102,0,.1)', tension: 0.4, fill: true, pointRadius: 2 }]
+};
+let chartDataRisk = { labels: [], datasets: [] };
+let tempChart, riskChart;
+
+function initCharts() {
+  const baseOpts = (yLabel) => ({
+    responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+    plugins: { legend: { labels: { color: '#5a8a6a', font: { size: 11 } } } },
+    scales: {
+      x: { grid: { color: '#1e3325' }, ticks: { color: '#5a8a6a', font: { size: 10 }, maxTicksLimit: 8 } },
+      y: { grid: { color: '#1e3325' }, ticks: { color: '#5a8a6a', font: { size: 10 } },
+           title: { display: true, text: yLabel, color: '#5a8a6a', font: { size: 10 } } }
+    }
+  });
+  tempChart = new Chart(document.getElementById('tempChart'), { type: 'line', data: chartDataTemp, options: baseOpts('°C') });
+  riskChart = new Chart(document.getElementById('riskChart'), { type: 'line', data: chartDataRisk, options: baseOpts('Risk Score') });
+}
+
+function connectWS() {
+  ws = new WebSocket(WS_URL);
+  ws.onopen = () => { console.log('[WS] Connected'); clearTimeout(reconnectTimer); };
+  ws.onmessage = (e) => { const d = JSON.parse(e.data); handleData(d); };
+  ws.onclose = () => { reconnectTimer = setTimeout(connectWS, 3000); };
+}
+
+function handleData(d) {
+  if (d.type === 'init' || d.type === 'sensorUpdate') {
+    sensorsData = d.sensors;
+    renderSensors(d.sensors);
+    updateKPIs(d.sensors);
+    updateCharts(d.sensors);
+    updateAlertLog(d.alerts);
+  }
+}
+
+function riskColor(score) {
+  if (score >= 75) return '#ff2244';
+  if (score >= 50) return '#ff6600';
+  if (score >= 25) return '#ffcc00';
+  return '#00cc66';
+}
+
+function renderSensors(sensors) {
+  const grid = document.getElementById('sensors-grid');
+
+  sensors.forEach(s => {
+    const prev = grid.querySelector(`[data-id="${s.id}"]`);
+    const wasFire = prev ? prev.dataset.fire === 'true' : false;
+    const isFire  = s.alertLevel >= 3;
+    if (!wasFire && isFire) showToast(s.name, s.location, s.riskScore, 'fire');
+    else if (s.alertLevel === 2 && prev && parseInt(prev.dataset.alert || '0') < 2) {
+      showToast(s.name, s.location, s.riskScore, 'warning');
+    }
+  });
+
+  grid.innerHTML = sensors.map((s, i) => {
+    const rc = riskColor(s.riskScore);
+    const alertClass = s.alertLevel >= 3 ? 'alert-3' : s.alertLevel === 2 ? 'alert-2' : '';
+
+    // GPS — server sends lat/lng on SENSORS array, merged via broadcast()
+    const hasGPS = s.lat != null && s.lng != null && !(s.lat === 0 && s.lng === 0);
+    const lat = hasGPS ? Number(s.lat).toFixed(5) : null;
+    const lng = hasGPS ? Number(s.lng).toFixed(5) : null;
+    const gpsHtml = hasGPS
+      ? `<a class="gps-link" href="https://www.google.com/maps?q=${lat},${lng}" target="_blank">
+           📍 ${lat}°N, ${lng}°E &nbsp;— Open Map
+         </a>`
+      : `<span class="gps-no">📡 No GPS fix yet</span>`;
+
+    // server uses manualFire (not fireSim)
+    const isManualFire = s.manualFire === true;
+
+    return `
+    <div class="sensor-card ${alertClass}" data-id="${s.id}" data-fire="${s.alertLevel>=3}" data-alert="${s.alertLevel}">
+      <div class="sensor-header">
+        <div>
+          <div class="sensor-name">${s.name}</div>
+          <div class="sensor-loc">${s.location}</div>
+        </div>
+        <div class="sensor-badge alert-${s.alertLevel}">${s.alertLabel}</div>
+      </div>
+
+      <div class="sensor-metrics">
+        <div class="metric">
+          <div class="metric-icon">🌡️</div>
+          <div class="metric-val" style="color:${s.temperature>=65?'#ff2244':s.temperature>=50?'#ff6600':s.temperature>=38?'#ffcc00':'#00ff88'}">${Number(s.temperature).toFixed(1)}°C</div>
+          <div class="metric-name">Temperature</div>
+        </div>
+        <div class="metric">
+          <div class="metric-icon">💧</div>
+          <div class="metric-val" style="color:${s.humidity<=15?'#ff2244':s.humidity<=25?'#ff6600':s.humidity<=40?'#ffcc00':'#00ff88'}">${Number(s.humidity).toFixed(1)}%</div>
+          <div class="metric-name">Humidity</div>
+        </div>
+        <div class="metric">
+          <div class="metric-icon">🔥</div>
+          <div class="metric-val" style="color:${s.smoke>=80?'#ff2244':s.smoke>=50?'#ff6600':s.smoke>=30?'#ffcc00':'#00ff88'}">${Number(s.smoke).toFixed(1)} ppm</div>
+          <div class="metric-name">Smoke</div>
+        </div>
+        <div class="metric">
+          <div class="metric-icon">🌬️</div>
+          <div class="metric-val" style="color:#00ccff">${Number(s.co2).toFixed(0)} ppm</div>
+          <div class="metric-name">CO₂</div>
+        </div>
+      </div>
+
+      <div class="sensor-risk-bar">
+        <div class="risk-bar-track">
+          <div class="risk-bar-fill" style="width:${s.riskScore}%;background:${rc}"></div>
+        </div>
+        <div class="risk-bar-label">
+          <span>Risk Score</span>
+          <span style="color:${rc};font-weight:700">${s.riskScore}/100</span>
+        </div>
+      </div>
+
+      <div class="sensor-gps">${gpsHtml}</div>
+
+      <div class="sensor-controls">
+        <button class="btn-fire ${isManualFire ? 'on' : 'off'}" onclick="toggleFire('${s.id}', ${!isManualFire})">
+          ${isManualFire ? '🔥 FIRE SIM ON — Click to Stop' : '🔥 Simulate Fire'}
+        </button>
+        <button class="btn-reset" onclick="resetSensor('${s.id}')">↺ Reset</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateKPIs(sensors) {
+  const avgT = (sensors.reduce((s, d) => s + d.temperature, 0) / sensors.length).toFixed(1);
+  const avgH = (sensors.reduce((s, d) => s + d.humidity, 0) / sensors.length).toFixed(1);
+  const avgS = (sensors.reduce((s, d) => s + d.smoke, 0) / sensors.length).toFixed(1);
+  const avgR = sensors.reduce((s, d) => s + d.riskScore, 0) / sensors.length;
+  const maxR = Math.max(...sensors.map(s => s.riskScore));
+  const maxRiskSensor = sensors.find(s => s.riskScore === maxR);
+
+  document.getElementById('avg-temp').textContent  = avgT;
+  document.getElementById('avg-hum').textContent   = avgH;
+  document.getElementById('avg-smoke').textContent = avgS;
+
+  document.getElementById('temp-bar').style.width      = Math.min(100, (+avgT / 80) * 100) + '%';
+  document.getElementById('temp-bar').style.background = +avgT > 50 ? '#ff6600' : +avgT > 35 ? '#ffcc00' : '#00cc66';
+  document.getElementById('hum-bar').style.width       = avgH + '%';
+  document.getElementById('hum-bar').style.background  = +avgH < 30 ? '#ff6600' : +avgH < 50 ? '#ffcc00' : '#00cc66';
+  document.getElementById('smoke-bar').style.width     = Math.min(100, +avgS) + '%';
+  document.getElementById('smoke-bar').style.background= +avgS > 50 ? '#ff2244' : +avgS > 25 ? '#ff6600' : '#00cc66';
+
+  const rc = riskColor(maxR);
+  const offset = 283 - (283 * maxR / 100);
+  document.getElementById('risk-ring-fill').style.strokeDashoffset = offset;
+  document.getElementById('risk-ring-fill').style.stroke = rc;
+  document.getElementById('risk-num').textContent   = Math.round(maxR);
+  document.getElementById('risk-num').style.color   = rc;
+  document.getElementById('risk-label').textContent = maxRiskSensor ? maxRiskSensor.alertLabel : 'NORMAL';
+  document.getElementById('risk-label').style.color = rc;
+
+  document.getElementById('sum-alerts').textContent   = sensors.filter(s => s.alertLevel >= 2).length;
+  document.getElementById('sum-avg-risk').textContent = Math.round(avgR);
+  document.getElementById('sum-max-temp').textContent = Math.max(...sensors.map(s => s.temperature)).toFixed(1);
+
+  document.getElementById('co2-bars').innerHTML = sensors.map((s, i) => `
+    <div style="margin-bottom:6px">
+      <div style="display:flex;justify-content:space-between;font-size:.65rem;color:var(--muted);margin-bottom:3px">
+        <span>${s.name}</span><span style="color:#00ccff">${Number(s.co2).toFixed(0)} ppm</span>
+      </div>
+      <div style="height:4px;border-radius:2px;background:#1a2e20;overflow:hidden">
+        <div style="height:100%;border-radius:2px;width:${Math.min(100,(s.co2/2000)*100)}%;background:${ZONE_COLORS[i]};transition:width .5s"></div>
+      </div>
+    </div>`).join('');
+}
+
+function updateCharts(sensors) {
+  const alpha = sensors.find(s => s.zone === 'alpha');
+  if (alpha && alpha.history && alpha.history.length > 0) {
+    chartDataTemp.labels = alpha.history.map(h => h.time);
+    chartDataTemp.datasets[0].data = alpha.history.map(h => h.temperature);
+    tempChart.update('none');
+  }
+  if (sensors[0]?.history?.length > 0) {
+    chartDataRisk.labels = sensors[0].history.map(h => h.time);
+    chartDataRisk.datasets = sensors.map((s, i) => ({
+      label: s.name,
+      data: s.history.map(h => h.riskScore),
+      borderColor: ZONE_COLORS[i],
+      backgroundColor: 'transparent',
+      tension: 0.4,
+      pointRadius: 2,
+    }));
+    riskChart.update('none');
+  }
+}
+
+function updateAlertLog(alerts) {
+  const el = document.getElementById('alert-log');
+  if (!alerts || alerts.length === 0) {
+    el.innerHTML = '<div class="no-alerts">✅ All zones normal</div>';
+    return;
+  }
+  el.innerHTML = alerts.map(a => `
+    <div class="alert-item" style="border-color:${a.color}">
+      <div class="alert-dot" style="background:${a.color}"></div>
+      <div class="alert-content">
+        <div class="alert-title">${a.sensor} — ${a.label}</div>
+        <div class="alert-meta">${a.location} · ${a.time} · Temp: ${a.temperature}°C · Smoke: ${a.smoke}ppm</div>
+      </div>
+      <div class="alert-score" style="color:${a.color}">${a.riskScore}</div>
+    </div>`).join('');
+}
+
+async function toggleFire(id, active) {
+  if (active) {
+    await fetch(`/api/sensors/${id}/simulate-fire`, { method: 'POST' });
+  } else {
+    await fetch(`/api/sensors/${id}/reset`, { method: 'POST' });
+  }
+}
+
+async function resetSensor(id) {
+  await fetch(`/api/sensors/${id}/reset`, { method: 'POST' });
+}
+
+function showToast(name, location, score, type) {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type === 'warning' ? 'warning' : ''}`;
+  toast.innerHTML = `
+    <div class="toast-title">${type === 'fire' ? '🔥 FIRE DETECTED' : '⚠️ HIGH RISK ALERT'}</div>
+    <div class="toast-body">${name} · ${location} · Risk Score: ${score}</div>`;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 5000);
+}
+
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+
+initCharts();
+connectWS();
+updateClock();
+setInterval(updateClock, 1000);
+</script>
+</body>
+</html>

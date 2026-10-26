@@ -1,0 +1,10 @@
+node_modules/
+serviceAccountKey.json
+.env
+.env.*
+!.env.example
+# Android generated files
+ForestFireDetect/**/build/
+ForestFireDetect/**/.gradle/
+ForestFireDetect/**/.idea/
+ForestFireDetect/local.properties
